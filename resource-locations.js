@@ -81,6 +81,11 @@ function groupLocationModel(zotero, group, allItems) {
     details.push('预计处理后保留条目分类：' + label(owner) + '；文献库：' + libraryName(owner) + '；' + paths(memberships, owner.libraryID) + '（保留原分类，并合入被合并资源的分类归属）');
     model.destination = {title:owner.getField('title') || '无标题',key:owner.key,library:libraryName(owner),paths:pathValues(memberships,owner.libraryID)};
   }
+  if (group.type === 'orphanMetadata') {
+    for (let item of group.items) describe(item, '待识别资源', '将调用 Zotero 内置 PDF 元数据识别并创建新父条目');
+    details.push('该模式为独立 PDF 新建父条目，不合并现有条目，也不改变分类归属');
+    return model;
+  }
   if (group.type === 'invalidResource') {
     let target = group.items[0];
     describe(target, '待清理资源', recycle(target));
