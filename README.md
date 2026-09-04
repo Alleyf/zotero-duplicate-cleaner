@@ -1,4 +1,34 @@
-# Zotero Duplicate Cleaner 0.10.0
+# Zotero Duplicate Cleaner
+
+面向 Zotero 10 的文献资源整理插件，帮助你在确认后处理重复条目、重复 PDF、重复笔记、孤儿 PDF 和失效附件。
+
+## 界面预览
+
+![资源流图](docs/images/resource-flow.png)
+
+![资源卡片与父子折叠](docs/images/resource-cards.png)
+
+## 主要功能
+
+- 重复条目扫描：按条目类型、DOI 或完整标题发现候选，优先保留 PDF 可用且元信息更完整的条目。
+- PDF 内容去重：按实际文件 SHA-256 判断，支持条目内 PDF 与独立 PDF 对照。
+- 笔记去重：仅对完整 HTML 内容完全相同的笔记提出候选。
+- 无效资源扫描：识别没有附件、附件文件缺失的条目及可安全处理的缺失附件记录。
+- 孤儿 PDF 建父条目：先扫描展示，用户勾选后分批调用 Zotero 内置元数据识别。
+- 资源流图：展示来源、判定过程、保留结果和处理去向。
+- 统计概览、名称搜索、全选当前可见结果和父子资源折叠。
+
+## 安装与使用
+
+从 GitHub Releases 下载最新 `.xpi`，在 Zotero 中打开“工具 → 插件”，点击齿轮并选择“从文件安装插件”，安装后重启 Zotero。打开“工具 → 文献资源整理”，选择扫描类型；结果默认不勾选，核对后再选择并处理。
+
+## 安全与隐私
+
+插件只访问当前 Zotero 文献库，不上传文献内容。PDF 去重在本地计算文件哈希；无法读取、等待下载、URL 附件以及带批注或关联记录的资源会被跳过。删除操作只将 Zotero 记录移入回收站。
+
+## 开发与发布
+
+运行 `./build.ps1` 构建 XPI。提交 `v*` 标签后，GitHub Actions 会自动构建并发布 Release。作者：[Alleyf](https://github.com/Alleyf)。
 
 工具 → 文献资源整理，在 Zotero 主窗口内打开带图标的管理面板。
 
@@ -22,7 +52,22 @@
 
 ## 构建
 
-运行 `./build.ps1`，生成工作区中的 `zotero-dedup-plugin-0.7.0.xpi` 和同内容的 `zotero-dedup-plugin.xpi`。打包时将 resource-locations.js、resource-cleanup.js 与 bootstrap.js 合为单一入口，并包含 manifest.json 和 icons/icon.svg，不依赖旧 chrome 页面。
+运行 `./build.ps1`，按 manifest.json 的版本号生成工作区中的 `zotero-dedup-plugin-<版本>.xpi` 和同内容的 `zotero-dedup-plugin.xpi`。打包时将 resource-locations.js、resource-cleanup.js 与 bootstrap.js 合为单一入口，并包含 manifest.json 和 icons/icon.svg，不依赖旧 chrome 页面。
+
+## 0.15.4 变更（2026-09-04）
+
+- **孤儿 PDF 识别改为流水线提交**：所有批次先依次提交（每批 10 个、批间仅等 250ms 让选中生效），不再逐批阻塞等待；全部提交后统一轮询识别进度（每 2 秒刷新面板状态，总上限 30 秒 + 每批 20 秒），整体耗时约等于 Zotero 识别队列的纯处理时间。
+- **修复混合选择跳组**：处理排序改为「识别 → 孤儿 PDF → 其他」，保证孤儿识别批次连续，混合勾选时不再有候选组被跳过。
+- **识别失败可预期**：超时后明确提示哪些情况会导致识别不出（无 DOI 的扫描件、中文文献等），识别仍在 Zotero 后台继续。
+
+## 0.15.3 变更（2026-09-04）
+
+- **哈希缓存**：`attachmentFingerprint` 按 `itemID + 路径 + 文件大小 + 修改时间` 缓存 SHA-256，重复扫描与处理后的自动重扫不再重复读取和摘要全库 PDF。
+- **消除循环内全库枚举**：`trashMissingGroupPDFs` 与 `mergeOrphanPDFs` 改为每组取一次条目快照，事务内的失效检测（父子关系、内容哈希、保护规则复核）保持不变。
+- **扫描提速**：`scan()` 中普通条目的 PDF 可用性状态由每组计算一次改为全量计算一次。
+- **修正「孤儿 PDF 识别」模式的展示**：不再渲染误导性的「合并后保留位置」区，资源流图改为显示「将创建新父条目」。
+- **识别完成轮询**：孤儿 PDF 批量识别由固定等待 800ms 改为逐秒轮询（上限 60 秒／批），识别未完成时给出明确提示。
+- **深色主题**：面板适配 `prefers-color-scheme: dark`，深色模式下使用深色表面与浅色文字。
 
 ## 本机验证（2026-09-04）
 
