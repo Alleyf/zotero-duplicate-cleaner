@@ -1,0 +1,17 @@
+{
+  "manifest_version": 2,
+  "name": "Zotero Duplicate Cleaner",
+  "version": "0.15.1",
+  "icons": { "48": "icons/icon.svg", "96": "icons/icon.svg" },
+  "description": "Review duplicate records and byte-identical orphan PDFs, preserving richer metadata.",
+  "author": "Alleyf",
+  "homepage_url": "https://github.com/Alleyf",
+  "applications": {
+    "zotero": {
+      "id": "zotero-dedup@local.dev",
+      "update_url": "https://www.zotero.org/",
+      "strict_min_version": "7.0",
+      "strict_max_version": "*"
+    }
+  }
+}

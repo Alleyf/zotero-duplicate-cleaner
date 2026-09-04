@@ -1,0 +1,5 @@
+*.xpi
+*.zip
+node_modules/
+_xpi_check/
+.DS_Store
