@@ -136,16 +136,28 @@ async function mergeOrphanPDFs(zotero, libraryID, group) {
   }
 }
 
-async function waitForRecognition(zotero, win, ids, timeoutMs, onProgress) {
+async function waitForRecognition(zotero, win, ids, timeoutMs, onProgress, isCancelled) {
   let deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise(resolve => win.setTimeout(resolve, 2000));
+    if (isCancelled && isCancelled()) return false;
     let current = await zotero.Items.getAsync(ids);
     let done = current.filter(entry => !entry || entry.deleted || entry.parentItemID).length;
     if (onProgress) onProgress('元数据识别进度：' + done + ' / ' + ids.length + '…');
     if (done === ids.length) return true;
   }
   return false;
+}
+async function diagnoseCrossRef(zotero) {
+  try {
+    await zotero.HTTP.request('GET', 'https://api.crossref.org/works/10.1038/nature12373', { timeout: 10000 });
+    return 'CrossRef 连接正常且未触发限流——识别失败更可能是 PDF 提取不出 DOI（扫描件、中文文献、书章等），这类 PDF 重试也无法识别';
+  } catch (error) {
+    if (error.status === 429) return 'CrossRef 返回 429，已触发限流，请等待几分钟后重试';
+    if (error.status === 503) return 'CrossRef 服务暂时不可用（503），请稍后重试';
+    if (error.status === 403) return 'CrossRef 返回 403，可能被限流或拒绝访问，请稍后重试';
+    return 'Zotero 自身无法连接 CrossRef（状态 ' + (error.status || '未知') + '）——识别失败是网络/代理问题，请检查 Zotero 的连接设置';
+  }
 }
 
 function openPanel(window) {
@@ -535,6 +547,7 @@ function openPanel(window) {
   button('none', '取消选择搜索结果', () => selection(false));
   button('merge', '处理选中', async () => {
     if (busy) return;
+    if (activeJobs) { report('已有处理任务在后台进行，请等待其完成。', true); return; }
     let selected = groups.filter(group => !group.row.hidden && group.checkbox.checked);
     if (!selected.length) { report('请先选择需要合并的重复组。'); return; }
     if (!zotero.Libraries.get(libraryID).editable) { report('当前文献库没有编辑权限。', true); return; }
@@ -545,6 +558,7 @@ function openPanel(window) {
       : '将合并选中的 ' + selected.length + ' 组重复资源，保留列表中的主条目／PDF／笔记，并将重复记录移入回收站。缺失 PDF 的重复条目优先淘汰，空白元信息先补齐。';
     if (!Services.prompt.confirm(window, '确认处理', confirmation)) return;
     setBusy(true);
+    activeJobs++;
     let merged = 0;
     let failures = [];
     try {
@@ -552,6 +566,7 @@ function openPanel(window) {
       let orderedSelected = selected.sort((first, second) => groupPriority(first.type) - groupPriority(second.type));
       let recognizeIDs = [];
       for (let groupIndex = 0; groupIndex < orderedSelected.length; groupIndex++) {
+        if (cancelled) break;
         let group = orderedSelected[groupIndex];
         try {
           if (group.resource) { await resourceApply(zotero, libraryID, group); merged++; continue; }
@@ -578,16 +593,22 @@ function openPanel(window) {
           merged++;
         } catch (error) { failures.push(error.message); zotero.logError(error); }
       }
-      if (recognizeIDs.length) {
-        report('已提交 ' + recognizeIDs.length + ' 个 PDF 进行元数据识别，等待完成…');
+      if (recognizeIDs.length && !cancelled) {
+        report('已提交 ' + recognizeIDs.length + ' 个 PDF 进行元数据识别，等待完成…（关闭面板可跳过等待，识别在 Zotero 后台继续）');
         let overallTimeout = 30000 + 20000 * Math.ceil(recognizeIDs.length / 10);
-        let completed = await waitForRecognition(zotero, window, recognizeIDs, overallTimeout, progress => report(progress));
-        if (!completed) report('部分 PDF 未在限定时间内识别完成（常见于无 DOI 的扫描件或中文文献），识别仍在后台继续，可稍后重新扫描查看。', true);
+        let completed = await waitForRecognition(zotero, window, recognizeIDs, overallTimeout, progress => { if (!cancelled) report(progress); }, () => cancelled);
+        if (!cancelled && !completed) {
+          let current = await zotero.Items.getAsync(recognizeIDs);
+          let unresolved = current.filter(entry => entry && !entry.deleted && !entry.parentItemID).length;
+          let diagnosis = await diagnoseCrossRef(zotero);
+          report('识别未全部完成：' + unresolved + ' / ' + recognizeIDs.length + ' 个未成功。诊断：' + diagnosis, true);
+        }
       }
+      if (cancelled) return;
       let remaining = await scan();
       report('已处理 ' + merged + ' 组／项；剩余 ' + remaining + ' 个候选。' + (failures.length ? '\n失败 ' + failures.length + ' 组：' + failures.join('；') : ''), failures.length > 0);
     } catch (error) { report('已合并 ' + merged + ' 组；重新扫描失败：' + error.message, true); zotero.logError(error); }
-    finally { setBusy(false); }
+    finally { activeJobs--; setBusy(false); }
   });
   function close() {
     cancelled = true;
