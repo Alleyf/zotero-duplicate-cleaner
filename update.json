@@ -1,0 +1,18 @@
+{
+  "addons": {
+    "zotero-dedup@local.dev": {
+      "updates": [
+        {
+          "version": "0.15.6",
+          "update_link": "https://github.com/Alleyf/zotero-duplicate-cleaner/releases/download/v0.15.6/zotero-dedup-plugin-0.15.6.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "10.0",
+              "strict_max_version": "*"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
