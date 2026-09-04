@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Zotero Duplicate Cleaner",
-  "version": "0.15.5",
+  "version": "0.15.6",
   "icons": { "48": "icons/icon.svg", "96": "icons/icon.svg" },
   "description": "Review duplicate records and byte-identical orphan PDFs, preserving richer metadata.",
   "author": "Alleyf",

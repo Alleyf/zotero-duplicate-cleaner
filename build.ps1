@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $pluginDirectory = $PSScriptRoot
 $manifest = Get-Content -LiteralPath (Join-Path $pluginDirectory 'manifest.json') -Raw | ConvertFrom-Json
-$outputPath = Join-Path (Split-Path $pluginDirectory -Parent) "zotero-dedup-plugin-$($manifest.version).xpi"
+$outputPath = Join-Path $pluginDirectory "zotero-dedup-plugin-$($manifest.version).xpi"
 Add-Type -AssemblyName System.IO.Compression
 $stream = [System.IO.File]::Open($outputPath, [System.IO.FileMode]::Create)
 $archive = [System.IO.Compression.ZipArchive]::new($stream, [System.IO.Compression.ZipArchiveMode]::Create)
@@ -21,5 +21,5 @@ try {
 } finally {
     $archive.Dispose()
 }
-Copy-Item -LiteralPath $outputPath -Destination (Join-Path (Split-Path $pluginDirectory -Parent) 'zotero-dedup-plugin.xpi') -Force
+Copy-Item -LiteralPath $outputPath -Destination (Join-Path $pluginDirectory 'zotero-dedup-plugin.xpi') -Force
 Get-Item -LiteralPath $outputPath
